@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>로컬 음성 Teach-back</title>
+<style>
+body{max-width:850px;margin:30px auto;padding:0 16px;font-family:system-ui;line-height:1.6}
+input,textarea,select,button{font:inherit;padding:8px;margin:4px}textarea{width:95%;height:180px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f4f4;padding:14px}
+</style>
+<h1>음성 Teach-back · 로컬 테스트</h1>
+<p>상대방은 AI 학생입니다. 마이크 권한을 허용하고 헤드폰을 사용하세요.
+한국어 AI 학생 한 명과 질문 횟수 제한 없이 대화합니다. 원본 음성은 저장하지 않습니다.</p>
+<label>로컬 서버 인증키 <input id="serverKey" type="password" autocomplete="off"></label><br>
+<label>평가용 Gemini 키 (서버 키 사용 설정 시 생략) <input id="textKey" type="password" autocomplete="off"></label>
+<p>기존 문제 생성 입력 JSON 파일을 선택하면 확정 개념과 근거를 가져옵니다.
+또는 아래에 음성 세션 요청 JSON을 붙여 넣으세요.</p>
+<input id="file" type="file" accept=".json,application/json"><br>
+<textarea id="request" spellcheck="false" placeholder='{"context":{"concepts":[...],"chunks":[...]},"concept_version_id":"...","explanation_language":"ko"}'></textarea><br>
+<label><input id="consent" type="checkbox">시작하면 Gemini 유료 음성 API에 연결합니다.</label><br>
+<button id="start">마이크 대화 시작</button><button id="end" disabled>대화 종료</button>
+<button id="evaluate" disabled>Gemini 이해도 평가 (별도 API 사용량)</button>
+<label>평가 모델 <input id="model" value="gemini:gemini-3.8-flash"></label>
+<p id="status" role="status">대기 중</p><pre id="transcript"></pre><pre id="result"></pre>
+<script>
+'use strict';
+const el = id => document.getElementById(id);
+let ws, ctx, stream, source, worklet, session, ending=false, nextPlay=0;
+const playing=new Set();
+function clearPlayback(){for(const s of playing){try{s.stop();}catch{}}playing.clear();nextPlay=0;}
+async function stopMic(){stream?.getTracks().forEach(t=>t.stop());source?.disconnect();worklet?.disconnect();}
+async function api(path,body){
+ const headers={'X-AI-API-Key':el('serverKey').value};
+ if(body){headers['Content-Type']='application/json';}
+ if(path.endsWith('/evaluate-detailed'))headers['X-AI-Key']=el('textKey').value;
+ const r=await fetch(path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined,cache:'no-store'});
+ const data=await r.json();if(!r.ok)throw new Error(JSON.stringify(data));return data;
+}
+el('file').onchange=async()=>{try{
+ const raw=JSON.parse(await el('file').files[0].text());
+ const context=raw.context || raw;
+ el('request').value=JSON.stringify({context,concept_version_id:raw.concept_version_id||raw.concept_version_ids?.[0]||context.concepts[0].version.id,
+ explanation_language:'ko'},null,2);
+}catch{el('status').textContent='확정 concepts와 chunks가 포함된 JSON을 선택하세요.';}};
+const processor=`class Capture extends AudioWorkletProcessor {
+ constructor(){super();this.samples=[];this.position=0;}
+ process(inputs){const data=inputs[0]?.[0];if(!data)return true;
+ // AudioContext sampleRate can differ by browser. Stream resampling retains phase across blocks.
+ for(let i=0;i<data.length;i++){this.position+=24000/sampleRate;
+ while(this.position>=1){this.samples.push(Math.max(-1,Math.min(1,data[i])));this.position-=1;
+ if(this.samples.length===960){const pcm=new Int16Array(this.samples.map(x=>Math.round(x*32767)));
+ this.port.postMessage(pcm.buffer,[pcm.buffer]);this.samples=[];}}}return true;}}
+ registerProcessor('capture',Capture);`;
+el('start').onclick=async()=>{
+ if(!el('consent').checked){el('status').textContent='유료 연결 안내를 확인하세요.';return;}
+ el('start').disabled=true;el('result').textContent='';el('transcript').textContent='';ending=false;
+ el('evaluate').disabled=true;
+ el('status').textContent='연결 준비 중입니다. 듣고 있어요가 표시되면 설명을 시작하세요.';
+ try{
+  const request=JSON.parse(el('request').value);
+  delete request.student_persona;request.explanation_language='ko';
+  ctx=new AudioContext({sampleRate:24000});await ctx.resume();
+  stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+  session=await api('/internal/teachback/sessions',request);
+  ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}${session.websocket_path}`);
+  ws.binaryType='arraybuffer';
+  ws.onopen=()=>{ws.send(JSON.stringify({type:'authenticate',connection_token:session.connection_token}));
+   delete session.connection_token;};
+  ws.onmessage=async e=>{try{
+   if(e.data instanceof ArrayBuffer){
+    const pcm=new Int16Array(e.data),b=ctx.createBuffer(1,pcm.length,24000);
+    b.getChannelData(0).set(Float32Array.from(pcm,x=>x/32768));
+    const s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);playing.add(s);
+    s.onended=()=>playing.delete(s);nextPlay=Math.max(ctx.currentTime,nextPlay);s.start(nextPlay);nextPlay+=b.duration;return;
+   }
+   const event=JSON.parse(e.data);
+   if(event.type==='ready'){
+    const url=URL.createObjectURL(new Blob([processor],{type:'application/javascript'}));
+    try{await ctx.audioWorklet.addModule(url);}finally{URL.revokeObjectURL(url);}
+    source=ctx.createMediaStreamSource(stream);worklet=new AudioWorkletNode(ctx,'capture');
+    worklet.port.onmessage=ev=>{if(ws.readyState===WebSocket.OPEN&&!ending){
+     if(ws.bufferedAmount>96000){el('status').textContent='연결이 느려 대화를 종료합니다.';el('end').click();return;}
+     ws.send(ev.data);}};
+    source.connect(worklet);worklet.connect(ctx.destination);
+    el('status').textContent='듣고 있어요. 개념을 자유롭게 설명하세요.';el('end').disabled=false;
+   }else if(event.type==='transcript'){
+    el('transcript').textContent+=`${event.role==='user'?'나':'AI'} [${event.start_ms}ms] ${event.delta}\n`;
+   }else if(event.type==='playback.clear'){clearPlayback();
+   }else if(event.type==='closed'){
+    await stopMic();clearPlayback();el('status').textContent=`종료: ${event.status} ${event.error_code||''}`;
+    el('evaluate').disabled=!event.provider_finalized;
+    el('result').textContent=JSON.stringify(await api(`/internal/teachback/sessions/${session.session_id}`),null,2);
+   }
+  }catch{el('status').textContent='음성 처리 오류. 대화를 종료하고 서버 설정을 확인하세요.';el('end').click();}};
+  ws.onclose=async e=>{await stopMic();clearPlayback();if(ctx&&ctx.state!=='closed')await ctx.close();el('start').disabled=false;el('end').disabled=true;
+   if(e.code!==1000)el('status').textContent=`연결 종료 (${e.code}). 세션 상태를 확인하세요.`;};
+  ws.onerror=()=>{el('status').textContent='WebSocket 연결 실패';};
+ }catch(e){await stopMic();if(ctx&&ctx.state!=='closed')await ctx.close();el('status').textContent=e.message;el('start').disabled=false;}
+};
+el('end').onclick=async()=>{ending=true;await stopMic();clearPlayback();
+ if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'end'}));el('end').disabled=true;};
+el('evaluate').onclick=async()=>{el('evaluate').disabled=true;try{
+ el('result').textContent=JSON.stringify(await api(`/internal/teachback/sessions/${session.session_id}/evaluate-detailed`,{model_id:el('model').value}),null,2);
+}catch(e){el('status').textContent=e.message;}finally{el('evaluate').disabled=false;}};
+window.addEventListener('pagehide',()=>{stream?.getTracks().forEach(t=>t.stop());ws?.close();});
+</script></html>

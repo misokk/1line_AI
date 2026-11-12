@@ -1,0 +1,3381 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Learning AI internal processing",
+    "version": "0.3.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/models": {
+      "get": {
+        "summary": "Models",
+        "operationId": "models_internal_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          }
+        ]
+      }
+    },
+    "/internal/models/validate-key": {
+      "post": {
+        "summary": "Validate Key",
+        "operationId": "validate_key_internal_models_validate_key_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/materials/extract": {
+      "post": {
+        "summary": "Extract",
+        "operationId": "extract_internal_materials_extract_post",
+        "security": [
+          {
+            "ServerKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 255,
+              "default": "material",
+              "title": "Filename"
+            }
+          },
+          {
+            "name": "material_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Material Id"
+            }
+          },
+          {
+            "name": "retry_failed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Retry Failed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Extraction"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/explanations/generate": {
+      "post": {
+        "summary": "Explain",
+        "operationId": "explain_internal_explanations_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplanationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationContent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/study-time/estimate": {
+      "post": {
+        "summary": "Workload",
+        "operationId": "workload_internal_study_time_estimate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkloadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkloadEstimate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          }
+        ]
+      }
+    },
+    "/internal/study-plan/generate": {
+      "post": {
+        "summary": "Study Plan",
+        "operationId": "study_plan_internal_study_plan_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkloadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          }
+        ]
+      }
+    },
+    "/internal/evaluations/detailed": {
+      "post": {
+        "summary": "Detailed Evaluation",
+        "operationId": "detailed_evaluation_internal_evaluations_detailed_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetailedEvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailedEvaluationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/materials/analyze": {
+      "post": {
+        "summary": "Analyze",
+        "operationId": "analyze_internal_materials_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftAnalysis"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/questions/generate": {
+      "post": {
+        "summary": "Generate",
+        "operationId": "generate_internal_questions_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedQuestions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/questions/grade": {
+      "post": {
+        "summary": "Grade",
+        "operationId": "grade_internal_questions_grade_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GradeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/teachback/sessions": {
+      "post": {
+        "summary": "Create Voice Session",
+        "operationId": "create_voice_session_internal_teachback_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          }
+        ]
+      }
+    },
+    "/internal/teachback/sessions/{session_id}": {
+      "get": {
+        "summary": "Voice Session Result",
+        "operationId": "voice_session_result_internal_teachback_sessions__session_id__get",
+        "security": [
+          {
+            "ServerKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceSessionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/teachback/sessions/{session_id}/evaluate": {
+      "post": {
+        "summary": "Evaluate Voice Session",
+        "operationId": "evaluate_voice_session_internal_teachback_sessions__session_id__evaluate_post",
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceEvaluationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/teachback/sessions/{session_id}/evaluate-detailed": {
+      "post": {
+        "summary": "Evaluate Voice Session Detailed",
+        "operationId": "evaluate_voice_session_detailed_internal_teachback_sessions__session_id__evaluate_detailed_post",
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceEvaluationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailedEvaluationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/evaluations/generate": {
+      "post": {
+        "summary": "Evaluate",
+        "operationId": "evaluate_internal_evaluations_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    },
+    "/internal/keywords/suggest": {
+      "post": {
+        "summary": "Keywords",
+        "operationId": "keywords_internal_keywords_suggest_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Keywords"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ServerKey": []
+          },
+          {
+            "ProviderBYOK": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalyzeRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/SourceChunk"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Chunks"
+          },
+          "explanation_language": {
+            "type": "string",
+            "enum": [
+              "ko",
+              "en"
+            ],
+            "title": "Explanation Language",
+            "default": "ko"
+          },
+          "chunk_chars": {
+            "type": "integer",
+            "maximum": 12000.0,
+            "minimum": 500.0,
+            "title": "Chunk Chars",
+            "default": 10000
+          },
+          "max_calls": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Max Calls",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chunks"
+        ],
+        "title": "AnalyzeRequest"
+      },
+      "AnswerVerification": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "consistent",
+              "inconsistent",
+              "not_verified"
+            ],
+            "title": "Status"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "scope"
+        ],
+        "title": "AnswerVerification"
+      },
+      "ChunkDraft": {
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Ordinal"
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page Number"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ordinal",
+          "page_number",
+          "text"
+        ],
+        "title": "ChunkDraft"
+      },
+      "ConceptChecklistItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Ordinal"
+          },
+          "criterion": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Criterion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "ordinal",
+          "criterion"
+        ],
+        "title": "ConceptChecklistItem"
+      },
+      "ConceptTime": {
+        "properties": {
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "learning_minutes": {
+            "type": "integer",
+            "title": "Learning Minutes"
+          },
+          "question_minutes": {
+            "type": "integer",
+            "title": "Question Minutes"
+          },
+          "review_minutes": {
+            "type": "integer",
+            "title": "Review Minutes"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "priority": {
+            "type": "number",
+            "title": "Priority"
+          },
+          "teachback_minutes": {
+            "type": "integer",
+            "title": "Teachback Minutes",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_version_id",
+          "name",
+          "learning_minutes",
+          "question_minutes",
+          "review_minutes",
+          "total_minutes",
+          "priority"
+        ],
+        "title": "ConceptTime"
+      },
+      "ConceptVersion": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version_no": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version No"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 12000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "is_confirmed": {
+            "type": "boolean",
+            "title": "Is Confirmed"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "checklist_items": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptChecklistItem"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Checklist Items"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "version_no",
+          "name",
+          "summary",
+          "is_confirmed",
+          "is_current",
+          "confirmed_at",
+          "checklist_items",
+          "evidence"
+        ],
+        "title": "ConceptVersion"
+      },
+      "ConfirmedConcept": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Unit Id"
+          },
+          "material_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Material Id"
+          },
+          "version": {
+            "$ref": "#/components/schemas/ConceptVersion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "unit_id",
+          "material_id",
+          "version"
+        ],
+        "title": "ConfirmedConcept"
+      },
+      "Coordinates": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "Coordinates"
+      },
+      "CriterionFeedback": {
+        "properties": {
+          "checklist_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Checklist Item Id"
+          },
+          "learner_quote": {
+            "type": "string",
+            "title": "Learner Quote"
+          },
+          "correct_explanation": {
+            "type": "string",
+            "title": "Correct Explanation"
+          },
+          "improvement": {
+            "type": "string",
+            "title": "Improvement"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "checklist_item_id",
+          "learner_quote",
+          "correct_explanation",
+          "improvement",
+          "evidence"
+        ],
+        "title": "CriterionFeedback"
+      },
+      "DetailedEvaluationRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "History"
+          },
+          "explanation_language": {
+            "type": "string",
+            "enum": [
+              "ko",
+              "en"
+            ],
+            "title": "Explanation Language",
+            "default": "ko"
+          },
+          "previous_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "concept_version_id",
+          "history"
+        ],
+        "title": "DetailedEvaluationRequest"
+      },
+      "DetailedEvaluationResult": {
+        "properties": {
+          "report": {
+            "$ref": "#/components/schemas/EvaluationResult"
+          },
+          "feedback": {
+            "items": {
+              "$ref": "#/components/schemas/CriterionFeedback"
+            },
+            "type": "array",
+            "title": "Feedback"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "report",
+          "feedback"
+        ],
+        "title": "DetailedEvaluationResult"
+      },
+      "Document": {
+        "properties": {
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/Page"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Pages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pages"
+        ],
+        "title": "Document"
+      },
+      "DraftAnalysis": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "const": "draft",
+            "title": "State",
+            "default": "draft"
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/DraftUnit"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Units"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "units"
+        ],
+        "title": "DraftAnalysis"
+      },
+      "DraftConcept": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Summary"
+          },
+          "checklist_items": {
+            "items": {
+              "type": "string",
+              "maxLength": 2000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Checklist Items"
+          },
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Keywords"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Evidence"
+          },
+          "estimated_difficulty": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "easy",
+                  "medium",
+                  "hard"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Difficulty"
+          },
+          "estimated_importance": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Importance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "summary",
+          "checklist_items",
+          "keywords",
+          "evidence"
+        ],
+        "title": "DraftConcept"
+      },
+      "DraftUnit": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "concepts": {
+            "items": {
+              "$ref": "#/components/schemas/DraftConcept"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Concepts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "concepts"
+        ],
+        "title": "DraftUnit"
+      },
+      "EvaluationComparison": {
+        "properties": {
+          "comparable": {
+            "type": "boolean",
+            "title": "Comparable"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "same_version",
+              "version_mismatch",
+              "checklist_mismatch",
+              "unverified"
+            ],
+            "title": "Reason"
+          },
+          "coverage_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Delta"
+          },
+          "changes": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "comparable",
+          "reason",
+          "coverage_delta",
+          "changes"
+        ],
+        "title": "EvaluationComparison"
+      },
+      "EvaluationRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "History"
+          },
+          "explanation_language": {
+            "type": "string",
+            "enum": [
+              "ko",
+              "en"
+            ],
+            "title": "Explanation Language",
+            "default": "ko"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "concept_version_id",
+          "history"
+        ],
+        "title": "EvaluationRequest"
+      },
+      "EvaluationResult": {
+        "properties": {
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "coverage_formula": {
+            "type": "string",
+            "const": "weighted-v1",
+            "title": "Coverage Formula",
+            "default": "weighted-v1"
+          },
+          "assessable_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Assessable Count"
+          },
+          "weighted_score": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Weighted Score"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReportItem"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Items"
+          },
+          "next_action": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Next Action"
+          },
+          "weak_checklist_item_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Weak Checklist Item Ids"
+          },
+          "weak_concept_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Weak Concept Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_version_id",
+          "coverage",
+          "assessable_count",
+          "weighted_score",
+          "items",
+          "next_action",
+          "weak_checklist_item_ids",
+          "weak_concept_ids"
+        ],
+        "title": "EvaluationResult"
+      },
+      "ExplanationContent": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "explanation_markdown": {
+            "type": "string",
+            "maxLength": 24000,
+            "minLength": 1,
+            "title": "Explanation Markdown"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "explanation_markdown",
+          "evidence"
+        ],
+        "title": "ExplanationContent"
+      },
+      "ExplanationRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "explanation_language": {
+            "type": "string",
+            "enum": [
+              "ko",
+              "en"
+            ],
+            "title": "Explanation Language",
+            "default": "ko"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "concept_version_id"
+        ],
+        "title": "ExplanationRequest"
+      },
+      "Extraction": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/Document"
+          },
+          "chunk_drafts": {
+            "items": {
+              "$ref": "#/components/schemas/ChunkDraft"
+            },
+            "type": "array",
+            "title": "Chunk Drafts"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "ocr_processed_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ocr Processed Pages"
+          },
+          "ocr_model_calls": {
+            "type": "integer",
+            "title": "Ocr Model Calls",
+            "default": 0
+          },
+          "ready_for_analysis": {
+            "type": "boolean",
+            "title": "Ready For Analysis",
+            "default": true
+          },
+          "review_required_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Review Required Pages"
+          },
+          "structured_pages": {
+            "items": {
+              "$ref": "#/components/schemas/ParsedPage"
+            },
+            "type": "array",
+            "title": "Structured Pages"
+          },
+          "recognition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParseMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "material_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Id"
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "default": "material"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "analysis_scope": {
+            "type": "string",
+            "title": "Analysis Scope",
+            "default": "source_text_only; model visual interpretations excluded"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "document",
+          "chunk_drafts",
+          "method",
+          "warnings",
+          "mime_type"
+        ],
+        "title": "Extraction"
+      },
+      "GeneratedQuestions": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StoredQuestion"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Items"
+          },
+          "verification": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerVerification"
+            },
+            "type": "array",
+            "title": "Verification"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "verification"
+        ],
+        "title": "GeneratedQuestions"
+      },
+      "GradeRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "stored_question": {
+            "$ref": "#/components/schemas/StoredQuestion"
+          },
+          "answer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MultipleChoiceAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/ShortAnswer"
+              }
+            ],
+            "title": "Answer",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "multiple_choice": "#/components/schemas/MultipleChoiceAnswer",
+                "short_answer": "#/components/schemas/ShortAnswer"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "stored_question",
+          "answer"
+        ],
+        "title": "GradeRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Keywords": {
+        "properties": {
+          "keywords": {
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Keywords"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "keywords"
+        ],
+        "title": "Keywords"
+      },
+      "Message": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Content"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "Message"
+      },
+      "ModelRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ModelRequest"
+      },
+      "MultipleChoiceAnswer": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "multiple_choice",
+            "title": "Type"
+          },
+          "selected_option_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "Selected Option Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "selected_option_ids"
+        ],
+        "title": "MultipleChoiceAnswer"
+      },
+      "Option": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "Option"
+      },
+      "Page": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Number"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "number",
+          "text"
+        ],
+        "title": "Page"
+      },
+      "ParseMetadata": {
+        "properties": {
+          "source_sha256": {
+            "type": "string",
+            "title": "Source Sha256"
+          },
+          "requested_model": {
+            "type": "string",
+            "title": "Requested Model"
+          },
+          "actual_models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Actual Models"
+          },
+          "mode": {
+            "type": "string",
+            "const": "enhanced",
+            "title": "Mode",
+            "default": "enhanced"
+          },
+          "ocr": {
+            "type": "string",
+            "const": "force",
+            "title": "Ocr",
+            "default": "force"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recognized",
+              "review_required",
+              "partial"
+            ],
+            "title": "Status"
+          },
+          "estimated_cost_usd": {
+            "type": "number",
+            "title": "Estimated Cost Usd"
+          },
+          "price_source": {
+            "type": "string",
+            "title": "Price Source",
+            "default": "https://www.upstage.ai/pricing/api"
+          },
+          "price_checked_on": {
+            "type": "string",
+            "title": "Price Checked On",
+            "default": "2026-11-04"
+          },
+          "cost_note": {
+            "type": "string",
+            "title": "Cost Note",
+            "default": "Initial public-list-price estimate, not actual billing; excludes VAT/credits."
+          },
+          "cache_hit": {
+            "type": "boolean",
+            "title": "Cache Hit",
+            "default": false
+          },
+          "requests_sent": {
+            "type": "integer",
+            "title": "Requests Sent",
+            "default": 0
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_sha256",
+          "requested_model",
+          "actual_models",
+          "status",
+          "estimated_cost_usd"
+        ],
+        "title": "ParseMetadata"
+      },
+      "ParsedElement": {
+        "properties": {
+          "source_element_id": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Source Element Id"
+          },
+          "page_number": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Number"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Order"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 100000,
+            "title": "Markdown"
+          },
+          "html": {
+            "type": "string",
+            "maxLength": 200000,
+            "title": "Html",
+            "default": ""
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 100000,
+            "title": "Text",
+            "default": ""
+          },
+          "coordinates": {
+            "items": {
+              "$ref": "#/components/schemas/Coordinates"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Coordinates"
+          },
+          "visual_interpretation": {
+            "type": "boolean",
+            "title": "Visual Interpretation",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_element_id",
+          "page_number",
+          "order",
+          "category",
+          "markdown"
+        ],
+        "title": "ParsedElement"
+      },
+      "ParsedPage": {
+        "properties": {
+          "page_number": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Number"
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 100000,
+            "title": "Markdown"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/ParsedElement"
+            },
+            "type": "array",
+            "title": "Elements"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recognized",
+              "review_required",
+              "missing"
+            ],
+            "title": "Status"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "page_number",
+          "markdown",
+          "elements",
+          "status"
+        ],
+        "title": "ParsedPage"
+      },
+      "PlanDay": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTask"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "estimated_minutes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Estimated Minutes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date",
+          "tasks",
+          "estimated_minutes"
+        ],
+        "title": "PlanDay"
+      },
+      "PlanTask": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "activity": {
+            "type": "string",
+            "enum": [
+              "learn",
+              "practice",
+              "teachback",
+              "review"
+            ],
+            "title": "Activity"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Count"
+          },
+          "estimated_minutes": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Estimated Minutes"
+          },
+          "source_pages": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Source Pages"
+          },
+          "priority": {
+            "type": "number",
+            "title": "Priority"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "concept_version_id",
+          "name",
+          "activity",
+          "count",
+          "estimated_minutes",
+          "source_pages",
+          "priority"
+        ],
+        "title": "PlanTask"
+      },
+      "PublicQuestionDraft": {
+        "properties": {
+          "question_type": {
+            "type": "string",
+            "enum": [
+              "multiple_choice",
+              "short_answer"
+            ],
+            "title": "Question Type"
+          },
+          "concept_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Concept Ids"
+          },
+          "concept_version_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Concept Version Ids"
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/Option"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Options"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "medium",
+              "hard"
+            ],
+            "title": "Difficulty"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question_type",
+          "concept_ids",
+          "concept_version_ids",
+          "prompt",
+          "options",
+          "difficulty",
+          "evidence"
+        ],
+        "title": "PublicQuestionDraft"
+      },
+      "QuestionGenerationRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "unit_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Unit Id"
+          },
+          "concept_version_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Concept Version Ids"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 5.0,
+            "title": "Count"
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "medium",
+              "hard",
+              "mixed"
+            ],
+            "title": "Difficulty"
+          },
+          "difficulty_plan": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "easy",
+                    "medium",
+                    "hard"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 20,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty Plan"
+          },
+          "question_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "multiple_choice",
+                "short_answer"
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Question Types"
+          },
+          "explanation_language": {
+            "type": "string",
+            "enum": [
+              "ko",
+              "en"
+            ],
+            "title": "Explanation Language",
+            "default": "ko"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "unit_id",
+          "concept_version_ids",
+          "count",
+          "difficulty"
+        ],
+        "title": "QuestionGenerationRequest",
+        "description": "Public internal HTTP input; smaller batches remain an implementation detail."
+      },
+      "QuestionResult": {
+        "properties": {
+          "is_correct": {
+            "type": "boolean",
+            "title": "Is Correct"
+          },
+          "feedback": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Feedback"
+          },
+          "correct_answer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MultipleChoiceAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/ShortAnswer"
+              }
+            ],
+            "title": "Correct Answer",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "multiple_choice": "#/components/schemas/MultipleChoiceAnswer",
+                "short_answer": "#/components/schemas/ShortAnswer"
+              }
+            }
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Explanation"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "is_correct",
+          "feedback",
+          "correct_answer",
+          "explanation",
+          "evidence"
+        ],
+        "title": "QuestionResult"
+      },
+      "ReportItem": {
+        "properties": {
+          "concept_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Id"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "checklist_item_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Checklist Item Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "explained",
+              "partial",
+              "omission",
+              "error",
+              "unverified"
+            ],
+            "title": "Status"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Description"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/SourceEvidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_id",
+          "concept_version_id",
+          "checklist_item_id",
+          "status",
+          "description",
+          "confidence",
+          "evidence"
+        ],
+        "title": "ReportItem"
+      },
+      "ShortAnswer": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "short_answer",
+            "title": "Type"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "text"
+        ],
+        "title": "ShortAnswer"
+      },
+      "SourceChunk": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "material_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Material Id"
+          },
+          "material_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Material Name"
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page Number"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "material_id",
+          "material_name",
+          "page_number",
+          "text"
+        ],
+        "title": "SourceChunk"
+      },
+      "SourceEvidence": {
+        "properties": {
+          "chunk_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chunk Id"
+          },
+          "material_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Material Id"
+          },
+          "material_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Material Name"
+          },
+          "page_number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page Number"
+          },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Excerpt"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chunk_id",
+          "material_id",
+          "material_name",
+          "page_number",
+          "excerpt"
+        ],
+        "title": "SourceEvidence"
+      },
+      "StoredQuestion": {
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/PublicQuestionDraft"
+          },
+          "correct_answer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MultipleChoiceAnswer"
+              },
+              {
+                "$ref": "#/components/schemas/ShortAnswer"
+              }
+            ],
+            "title": "Correct Answer",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "multiple_choice": "#/components/schemas/MultipleChoiceAnswer",
+                "short_answer": "#/components/schemas/ShortAnswer"
+              }
+            }
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 12000,
+            "minLength": 1,
+            "title": "Explanation"
+          },
+          "accepted_answers": {
+            "items": {
+              "type": "string",
+              "maxLength": 12000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Accepted Answers"
+          },
+          "arithmetic_expression": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arithmetic Expression"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "correct_answer",
+          "explanation"
+        ],
+        "title": "StoredQuestion"
+      },
+      "StudyContext": {
+        "properties": {
+          "concepts": {
+            "items": {
+              "$ref": "#/components/schemas/ConfirmedConcept"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Concepts"
+          },
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/SourceChunk"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Chunks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concepts",
+          "chunks"
+        ],
+        "title": "StudyContext"
+      },
+      "StudyPlan": {
+        "properties": {
+          "today": {
+            "type": "string",
+            "format": "date",
+            "title": "Today"
+          },
+          "exam_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Exam Date"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "concept_count": {
+            "type": "integer",
+            "title": "Concept Count"
+          },
+          "urgent": {
+            "type": "boolean",
+            "title": "Urgent"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/PlanDay"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "today_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTask"
+            },
+            "type": "array",
+            "title": "Today Tasks"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "today",
+          "exam_date",
+          "total_pages",
+          "concept_count",
+          "urgent",
+          "days",
+          "today_tasks",
+          "total_minutes",
+          "assumptions"
+        ],
+        "title": "StudyPlan"
+      },
+      "StudyTimeEstimate": {
+        "properties": {
+          "estimate": {
+            "type": "boolean",
+            "const": true,
+            "title": "Estimate",
+            "default": true
+          },
+          "remaining_days": {
+            "type": "integer",
+            "title": "Remaining Days"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "recommended_daily_minutes": {
+            "type": "integer",
+            "title": "Recommended Daily Minutes"
+          },
+          "concepts": {
+            "items": {
+              "$ref": "#/components/schemas/ConceptTime"
+            },
+            "type": "array",
+            "title": "Concepts"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          },
+          "priority_guidance": {
+            "type": "string",
+            "title": "Priority Guidance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "remaining_days",
+          "total_minutes",
+          "recommended_daily_minutes",
+          "concepts",
+          "assumptions",
+          "priority_guidance"
+        ],
+        "title": "StudyTimeEstimate"
+      },
+      "TagRequest": {
+        "properties": {
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "question": {
+            "$ref": "#/components/schemas/PublicQuestionDraft"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "subject_hint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Hint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "context"
+        ],
+        "title": "TagRequest"
+      },
+      "TimeConcept": {
+        "properties": {
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "remaining_criteria": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Remaining Criteria"
+          },
+          "remaining_questions": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Remaining Questions",
+            "default": 0
+          },
+          "review_cycles": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Review Cycles",
+            "default": 1
+          },
+          "review_criteria": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 50.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Criteria"
+          },
+          "weakness": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Weakness",
+            "default": 0
+          },
+          "difficulty": {
+            "type": "string",
+            "enum": [
+              "easy",
+              "medium",
+              "hard"
+            ],
+            "title": "Difficulty",
+            "default": "medium"
+          },
+          "importance": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Importance",
+            "default": 0.5
+          },
+          "teachback_sessions": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Teachback Sessions",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "concept_version_id",
+          "name",
+          "remaining_criteria"
+        ],
+        "title": "TimeConcept"
+      },
+      "TranscriptFragment": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "delta": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Delta"
+          },
+          "start_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Start Ms"
+          },
+          "end_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "End Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "delta",
+          "start_ms",
+          "end_ms"
+        ],
+        "title": "TranscriptFragment"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VoiceEvaluationRequest": {
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Model Id"
+          },
+          "previous_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id"
+        ],
+        "title": "VoiceEvaluationRequest"
+      },
+      "VoiceSessionCreated": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "connection_token": {
+            "type": "string",
+            "title": "Connection Token"
+          },
+          "websocket_path": {
+            "type": "string",
+            "title": "Websocket Path"
+          },
+          "connect_within_seconds": {
+            "type": "integer",
+            "title": "Connect Within Seconds",
+            "default": 60
+          },
+          "max_duration_seconds": {
+            "type": "integer",
+            "title": "Max Duration Seconds"
+          },
+          "sample_rate": {
+            "type": "integer",
+            "title": "Sample Rate",
+            "default": 24000
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "connection_token",
+          "websocket_path",
+          "max_duration_seconds"
+        ],
+        "title": "VoiceSessionCreated"
+      },
+      "VoiceSessionRequest": {
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "explanation_language": {
+            "type": "string",
+            "const": "ko",
+            "title": "Explanation Language",
+            "default": "ko"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context",
+          "concept_version_id"
+        ],
+        "title": "VoiceSessionRequest"
+      },
+      "VoiceSessionResult": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "concept_version_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Concept Version Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "created",
+              "active",
+              "closed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "question_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Question Count"
+          },
+          "transcript": {
+            "items": {
+              "$ref": "#/components/schemas/TranscriptFragment"
+            },
+            "type": "array",
+            "title": "Transcript"
+          },
+          "provider_finalized": {
+            "type": "boolean",
+            "title": "Provider Finalized"
+          },
+          "usage": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Usage"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "concept_version_id",
+          "status",
+          "question_count",
+          "transcript",
+          "provider_finalized",
+          "usage"
+        ],
+        "title": "VoiceSessionResult"
+      },
+      "WorkloadEstimate": {
+        "properties": {
+          "remaining_days": {
+            "type": "integer",
+            "title": "Remaining Days"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "concept_count": {
+            "type": "integer",
+            "title": "Concept Count"
+          },
+          "recommended_daily_pages": {
+            "type": "integer",
+            "title": "Recommended Daily Pages"
+          },
+          "recommended_daily_concepts": {
+            "type": "integer",
+            "title": "Recommended Daily Concepts"
+          },
+          "time_estimate": {
+            "$ref": "#/components/schemas/StudyTimeEstimate"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "remaining_days",
+          "total_pages",
+          "concept_count",
+          "recommended_daily_pages",
+          "recommended_daily_concepts",
+          "time_estimate",
+          "assumptions"
+        ],
+        "title": "WorkloadEstimate"
+      },
+      "WorkloadRequest": {
+        "properties": {
+          "total_pages": {
+            "type": "integer",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Total Pages"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "exam_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Exam Date"
+          },
+          "today": {
+            "type": "string",
+            "format": "date",
+            "title": "Today"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TimeConcept"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total_pages",
+          "context",
+          "exam_date"
+        ],
+        "title": "WorkloadRequest"
+      }
+    },
+    "securitySchemes": {
+      "ServerKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-AI-API-Key"
+      },
+      "ProviderBYOK": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-AI-Key"
+      }
+    }
+  }
+}

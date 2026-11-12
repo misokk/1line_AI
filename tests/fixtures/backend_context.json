@@ -1,0 +1,55 @@
+{
+  "concepts": [
+    {
+      "concept_id": "0000000a-1111-4111-8111-111111111111",
+      "unit_id": "0000000c-1111-4111-8111-111111111111",
+      "material_id": "00000064-1111-4111-8111-111111111111",
+      "version": {
+        "id": "0000000b-1111-4111-8111-111111111111",
+        "version_no": 1,
+        "name": "Simple Present",
+        "summary": "The simple present describes habits and general truths.",
+        "is_confirmed": true,
+        "is_current": false,
+        "confirmed_at": "2026-11-03T00:00:00Z",
+        "checklist_items": [
+          {
+            "id": "00000014-1111-4111-8111-111111111111",
+            "ordinal": 1,
+            "criterion": "Explain habitual actions"
+          },
+          {
+            "id": "00000015-1111-4111-8111-111111111111",
+            "ordinal": 2,
+            "criterion": "Explain third-person -s"
+          }
+        ],
+        "evidence": [
+          {
+            "chunk_id": "00000001-1111-4111-8111-111111111111",
+            "material_id": "00000064-1111-4111-8111-111111111111",
+            "material_name": "english_grammar.pdf",
+            "page_number": 1,
+            "excerpt": "The simple present describes habits and general truths."
+          }
+        ]
+      }
+    }
+  ],
+  "chunks": [
+    {
+      "id": "00000001-1111-4111-8111-111111111111",
+      "material_id": "00000064-1111-4111-8111-111111111111",
+      "material_name": "english_grammar.pdf",
+      "page_number": 1,
+      "text": "Unit 1: Simple Present\n\nThe simple present describes habits and general truths.\nUse the base verb with I, you, we, and they.\nAdd -s or -es with he, she, and it.\nExample: She studies English every day.\nUse do not or does not with the base verb for negatives."
+    },
+    {
+      "id": "00000002-1111-4111-8111-111111111111",
+      "material_id": "00000064-1111-4111-8111-111111111111",
+      "material_name": "english_grammar.pdf",
+      "page_number": 2,
+      "text": "Unit 2: Present Continuous\n\nThe present continuous describes actions happening now.\nForm it with am, is, or are followed by a verb ending in -ing.\nExample: They are studying English now.\nThe simple present is for habits; the present continuous is for current actions."
+    }
+  ]
+}

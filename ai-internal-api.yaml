@@ -1,0 +1,3165 @@
+openapi: 3.1.0
+info:
+  title: TeachMe AI 내부 통신 API
+  version: 0.3.0
+  description: '메인 백엔드 → AI 서버 통신 계약. 사용자용 백엔드 공개 API와 별도이다.
+
+    HTTP 경로·요청·성공 응답 스키마는 현재 FastAPI에서 추출하고, 타입 선언이 없는 응답·런타임 제약·오류·WebSocket 규약을 보충했다.
+
+    동기 HTTP 처리이며 Job/DB/사용자 권한/재시도 제어는 메인 백엔드 책임이다. 응답을 data로 감싸지 않는다(GET 모델 목록 제외).
+
+    AI 서버는 단원·개념·문제·보고서의 영구 DB ID를 생성하지 않는다. 음성 session_id는 예외로 AI 서버의 임시 연결 ID이다.
+
+    인증 헤더·키·connection_token을 로그나 저장소에 기록하지 않는다. 문서의 예시는 합성 데이터이다.
+
+    이 파일은 코드의 변경으로 자동 갱신되지 않으므로 변경 시 실제 /openapi.json과 다시 대조한다.'
+paths:
+  /health:
+    get:
+      summary: 상태 확인
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - status
+                properties:
+                  status:
+                    type: string
+                    const: ok
+                additionalProperties: false
+      description: 인증 없이 프로세스의 상태를 확인한다. 외부 모델 접근/DB 연결을 검사하지 않는다.
+      tags:
+      - 상태
+      security: []
+  /internal/models:
+    get:
+      summary: 텍스트 모델 목록
+      operationId: models_internal_models_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - id
+                      - provider
+                      - label
+                      - available
+                      properties:
+                        id:
+                          type: string
+                        provider:
+                          type: string
+                        label:
+                          type: string
+                        available:
+                          type: boolean
+                      additionalProperties: false
+                additionalProperties: false
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 서버 설정 목록이며 외부 접근 검증 결과가 아니다. available은 설정과 SDK 가용성 기준이다.
+      tags:
+      - 모델
+  /internal/models/validate-key:
+    post:
+      summary: 모델 접근 확인
+      operationId: validate_key_internal_models_validate_key_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - valid
+                - model_id
+                properties:
+                  valid:
+                    type: boolean
+                    const: true
+                  model_id:
+                    type: string
+                additionalProperties: false
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 명시적 model_id 필수. Gemini models.get으로 키·모델 접근만 확인하며 콘텐츠를 생성하지 않는다.
+      tags:
+      - 모델
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/materials/extract:
+    post:
+      summary: 문서 추출
+      operationId: extract_internal_materials_extract_post
+      security:
+      - ServerKey: []
+      parameters:
+      - name: filename
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 255
+          default: material
+          title: Filename
+      - name: material_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Material Id
+      - name: retry_failed
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Retry Failed
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Extraction'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+          text/plain:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+      description: multipart가 아닌 원본 파일 bytes를 Content-Type과 함께 전송한다. PDF/PNG/JPEG는 Upstage, TXT는 로컬 처리. chunk_drafts는
+        저장 전 청크이다. ready_for_analysis/warnings/review_required_pages를 확인하고 검토가 필요한 페이지를 처리한다. material_id는 백엔드 UUID
+        v4를 권장한다. retry_failed=true는 실패한 인식의 명시적 재실행을 위한 값이며 외부 비용이 발생할 수 있다.
+      tags:
+      - 자료
+  /internal/explanations/generate:
+    post:
+      summary: 확정 개념 설명
+      operationId: explain_internal_explanations_generate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExplanationRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  context: &id001
+                    concepts:
+                    - concept_id: 00000003-0000-4000-8000-000000000003
+                      unit_id: 00000002-0000-4000-8000-000000000002
+                      material_id: 00000001-0000-4000-8000-000000000001
+                      version:
+                        id: 00000004-0000-4000-8000-000000000004
+                        version_no: 1
+                        name: 습관
+                        summary: 반복되는 행동의 의미
+                        is_confirmed: true
+                        is_current: true
+                        confirmed_at: '2026-11-01T00:00:00+09:00'
+                        checklist_items:
+                        - id: 00000005-0000-4000-8000-000000000005
+                          ordinal: 1
+                          criterion: 습관이 반복되는 행동임을 설명한다.
+                        evidence:
+                        - &id004
+                          chunk_id: 00000006-0000-4000-8000-000000000006
+                          material_id: 00000001-0000-4000-8000-000000000001
+                          material_name: sample.txt
+                          page_number: 1
+                          excerpt: 반복되는 행동은 습관이다.
+                    chunks: &id003
+                    - id: 00000006-0000-4000-8000-000000000006
+                      material_id: 00000001-0000-4000-8000-000000000001
+                      material_name: sample.txt
+                      page_number: 1
+                      text: 반복되는 행동은 습관이다.
+                  concept_version_id: 00000004-0000-4000-8000-000000000004
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplanationContent'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: concept_version_id에 해당하는 확정 버전과 근거로 title/explanation_markdown/evidence를 반환한다. 모델 ID 필수.
+      tags:
+      - 설명
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/study-time/estimate:
+    post:
+      summary: 학습량·시간 추정
+      operationId: workload_internal_study_time_estimate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkloadRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value: &id002
+                  total_pages: 1
+                  context: *id001
+                  exam_date: '2026-12-14'
+                  today: '2026-12-01'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkloadEstimate'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 외부 AI 호출 없음. total_pages/context/exam_date 및 선택 today/progress를 받는다. progress를 보내면 context의 모든
+        버전을 중복 없이 포함해야 하며 remaining_criteria는 확정 체크리스트 수 이하여야 한다. progress 생략 시 전체 미학습·개념당 문제 2개/Teach-back 1회/복습
+        1회 기본값을 사용한다. 시험이 지난 경우 remaining_days=0이며 남은 학습량을 오늘 하루 기준으로 추정한다. 계획 생성의 과거 날짜 거절 규칙과 다르다.
+      tags:
+      - 계획
+  /internal/study-plan/generate:
+    post:
+      summary: 날짜별 계획 생성
+      operationId: study_plan_internal_study_plan_generate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkloadRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value: *id002
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyPlan'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 외부 AI 호출 없음. estimate와 같은 입력. 시험 전날까지 배치, 시험 당일이면 오늘로 압축. 과거 날짜/366일 초과 거절. 취약·미학습 우선, 학습→문제→Teach-back
+        후 복습 배치. 하루 공부 가능 시간 입력/완료 이력/일정 저장은 제공하지 않는다. today_tasks는 days의 오늘 할 일과 중복된 조회 편의 필드이다.
+      tags:
+      - 계획
+  /internal/evaluations/detailed:
+    post:
+      summary: 상세 이해도 평가·비교
+      operationId: detailed_evaluation_internal_evaluations_detailed_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DetailedEvaluationRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  context: *id001
+                  concept_version_id: 00000004-0000-4000-8000-000000000004
+                  history: &id006
+                  - role: user
+                    content: 습관은 반복되는 행동이에요.
+                  previous_result: null
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedEvaluationResult'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: report에 기본 평가, feedback에 발화 인용/교정/개선점/근거를 반환한다. previous_result 생략 시 comparison=null. 같은 버전·같은
+        체크리스트일 때 비교 가능하며 coverage_delta=현재-이전이다. 이전 평가를 이번 사용자 설명의 증거로 사용하지 않는다. 모델 ID 필수.
+      tags:
+      - 평가
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/materials/analyze:
+    post:
+      summary: 개념 초안 분석
+      operationId: analyze_internal_materials_analyze_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  chunks: *id003
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftAnalysis'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 저장된 SourceChunk와 명시적 model_id를 전달한다. state=draft인 단원·개념·문자열 체크리스트·근거 초안을 반환한다. 확정/DB 저장은 백엔드가
+        수행한다.
+      tags:
+      - 자료
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/questions/generate:
+    post:
+      summary: 5~20문항 생성
+      operationId: generate_internal_questions_generate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionGenerationRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  context: *id001
+                  unit_id: 00000002-0000-4000-8000-000000000002
+                  concept_version_ids:
+                  - 00000004-0000-4000-8000-000000000004
+                  count: 5
+                  difficulty: mixed
+                  difficulty_plan:
+                  - easy
+                  - medium
+                  - hard
+                  - easy
+                  - medium
+                  question_types:
+                  - multiple_choice
+                  - short_answer
+                  explanation_language: ko
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedQuestions'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: count 5~20. mixed는 count와 같은 길이이며 최소 두 난이도를 포함한 difficulty_plan 필수, 단일 난이도에서는 difficulty_plan을
+        전달하지 않는다. question_types는 한 유형 또는 두 유형 선택이며 정확한 유형별 개수 입력은 없다. StoredQuestion 정답·해설은 백엔드 비공개 저장. verification은
+        산술 일관성 검사이며 not_verified는 의미 오류나 생성 실패를 뜻하지 않는다. 분할 호출 실패 시 전체 요청이 실패한다. 모델 ID 필수.
+      tags:
+      - 문제
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/questions/grade:
+    post:
+      summary: 문제 1개 채점
+      operationId: grade_internal_questions_grade_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GradeRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  context: *id001
+                  stored_question:
+                    question: &id007
+                      question_type: short_answer
+                      concept_ids:
+                      - 00000003-0000-4000-8000-000000000003
+                      concept_version_ids:
+                      - 00000004-0000-4000-8000-000000000004
+                      prompt: 반복되는 행동을 무엇이라고 하나요?
+                      options: []
+                      difficulty: easy
+                      evidence:
+                      - *id004
+                    correct_answer:
+                      type: short_answer
+                      text: 습관
+                    explanation: 원문에서 반복되는 행동을 습관이라고 합니다.
+                    accepted_answers:
+                    - 습관
+                    arithmetic_expression: null
+                  answer:
+                    type: short_answer
+                    text: 습관
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionResult'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: stored_question과 answer를 하나씩 전달한다. 객관식·정확 일치 단답형은 Python 처리, 나머지 단답형은 의미 평가를 수행한다. 의미 평가에는 명시적
+        model_id가 필요하므로 백엔드는 항상 전달하는 것이 좋다. 채점 전에 풀이자에게 정답을 노출하지 않는다.
+      tags:
+      - 문제
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/teachback/sessions:
+    post:
+      summary: 임시 음성 세션 생성
+      operationId: create_voice_session_internal_teachback_sessions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceSessionRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  context: *id001
+                  concept_version_id: 00000004-0000-4000-8000-000000000004
+                  explanation_language: ko
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSessionCreated'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 확정 context와 concept_version_id로 임시 세션과 1회용 접속 토큰을 생성한다. 한국어 전용. 본문 model_id/BYOK 없음. 서버 음성 설정을
+        사용한다. 백엔드가 사용자와 임시 session_id를 연결하고 프론트에는 토큰/WS 경로만 전달한다. x-websocket 참고.
+      tags:
+      - 음성
+  /internal/teachback/sessions/{session_id}:
+    get:
+      summary: 음성 결과 조회
+      operationId: voice_session_result_internal_teachback_sessions__session_id__get
+      security:
+      - ServerKey: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSessionResult'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      description: 상태/전사/종료 확인/사용량을 반환한다. 없는 세션·만료 세션은 404가 아닌 422 VALIDATION_ERROR이다. status=closed와 provider_finalized=true가
+        모두 충족되어야 평가할 수 있다.
+      tags:
+      - 음성
+  /internal/teachback/sessions/{session_id}/evaluate:
+    post:
+      summary: 음성 기본 평가
+      operationId: evaluate_voice_session_internal_teachback_sessions__session_id__evaluate_post
+      security:
+      - ServerKey: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceEvaluationRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value: &id005
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  previous_result: null
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResult'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      description: 정상 종료된 세션의 사용자 전사로 상세 평가를 실행하고 report만 반환한다. model_id는 텍스트 평가용이다. 같은 세션의 성공 결과는 메모리 캐시되어 재사용되고
+        이전 결과가 있으면 비교만 다시 계산한다. 실패는 캐시하지 않는다. 동시 평가 409.
+      tags:
+      - 음성
+  /internal/teachback/sessions/{session_id}/evaluate-detailed:
+    post:
+      summary: 음성 상세 평가
+      operationId: evaluate_voice_session_detailed_internal_teachback_sessions__session_id__evaluate_detailed_post
+      security:
+      - ServerKey: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceEvaluationRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value: *id005
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedEvaluationResult'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      description: 정상 종료된 사용자 전사로 상세 평가. evaluate와 성공 캐시를 공유한다. 이미 성공하면 다른 model_id를 보내도 새 평가를 실행하지 않는다. 실패한 평가의
+        재요청은 새 유료 호출이 될 수 있다. 서버 재시작 후 캐시/전사는 사라지므로 백엔드가 보관한다.
+      tags:
+      - 음성
+  /internal/evaluations/generate:
+    post:
+      summary: 기본 이해도 평가
+      operationId: evaluate_internal_evaluations_generate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  context: *id001
+                  concept_version_id: 00000004-0000-4000-8000-000000000004
+                  history: *id006
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResult'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 사용자 발화만 평가한다. AI 발화는 학습자 지식으로 취급하지 않는다. 확정 체크리스트별 평가와 Python weighted-v1 점수를 반환한다. 모델 ID 필수.
+      tags:
+      - 평가
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+  /internal/keywords/suggest:
+    post:
+      summary: 문제 키워드 추출
+      operationId: keywords_internal_keywords_suggest_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagRequest'
+            examples:
+              synthetic:
+                summary: 합성 데이터. 백엔드 DB 값과 실제 허용 model_id로 교체한다.
+                value:
+                  model_id: gemini:YOUR_TEXT_MODEL
+                  context: *id001
+                  question: *id007
+                  subject_hint: null
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Keywords'
+        '422':
+          $ref: '#/components/responses/InternalError422'
+        '401':
+          $ref: '#/components/responses/InternalError401'
+        '409':
+          $ref: '#/components/responses/InternalError409'
+        '413':
+          $ref: '#/components/responses/InternalError413'
+        '429':
+          $ref: '#/components/responses/InternalError429'
+        '502':
+          $ref: '#/components/responses/InternalError502'
+        '503':
+          $ref: '#/components/responses/InternalError503'
+        '504':
+          $ref: '#/components/responses/InternalError504'
+      security:
+      - ServerKey: []
+      description: 공개 문제 초안과 확정 context에서 키워드 1~5개를 제안한다. DB 태그 생성/중복 병합은 백엔드 책임. 모델 ID 필수.
+      tags:
+      - 문제
+      parameters:
+      - name: X-AI-Key
+        in: header
+        required: false
+        description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+        schema:
+          type: string
+components:
+  schemas:
+    AnalyzeRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        chunks:
+          items:
+            $ref: '#/components/schemas/SourceChunk'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Chunks
+        explanation_language:
+          type: string
+          enum:
+          - ko
+          - en
+          title: Explanation Language
+          default: ko
+        chunk_chars:
+          type: integer
+          maximum: 12000.0
+          minimum: 500.0
+          title: Chunk Chars
+          default: 10000
+        max_calls:
+          type: integer
+          maximum: 40.0
+          minimum: 1.0
+          title: Max Calls
+          default: 10
+      additionalProperties: false
+      type: object
+      required:
+      - chunks
+      title: AnalyzeRequest
+    AnswerVerification:
+      properties:
+        status:
+          type: string
+          enum:
+          - consistent
+          - inconsistent
+          - not_verified
+          title: Status
+        scope:
+          type: string
+          title: Scope
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - scope
+      title: AnswerVerification
+    ChunkDraft:
+      properties:
+        ordinal:
+          type: integer
+          minimum: 1.0
+          title: Ordinal
+        page_number:
+          type: integer
+          minimum: 1.0
+          title: Page Number
+        text:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Text
+      additionalProperties: false
+      type: object
+      required:
+      - ordinal
+      - page_number
+      - text
+      title: ChunkDraft
+    ConceptChecklistItem:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        ordinal:
+          type: integer
+          minimum: 1.0
+          title: Ordinal
+        criterion:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Criterion
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - ordinal
+      - criterion
+      title: ConceptChecklistItem
+    ConceptTime:
+      properties:
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        learning_minutes:
+          type: integer
+          title: Learning Minutes
+        question_minutes:
+          type: integer
+          title: Question Minutes
+        review_minutes:
+          type: integer
+          title: Review Minutes
+        total_minutes:
+          type: integer
+          title: Total Minutes
+        priority:
+          type: number
+          title: Priority
+        teachback_minutes:
+          type: integer
+          title: Teachback Minutes
+          default: 0
+      additionalProperties: false
+      type: object
+      required:
+      - concept_version_id
+      - name
+      - learning_minutes
+      - question_minutes
+      - review_minutes
+      - total_minutes
+      - priority
+      title: ConceptTime
+    ConceptVersion:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        version_no:
+          type: integer
+          minimum: 1.0
+          title: Version No
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        summary:
+          anyOf:
+          - type: string
+            maxLength: 12000
+          - type: 'null'
+          title: Summary
+        is_confirmed:
+          type: boolean
+          title: Is Confirmed
+        is_current:
+          type: boolean
+          title: Is Current
+        confirmed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Confirmed At
+        checklist_items:
+          items:
+            $ref: '#/components/schemas/ConceptChecklistItem'
+          type: array
+          maxItems: 50
+          title: Checklist Items
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          maxItems: 200
+          title: Evidence
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - version_no
+      - name
+      - summary
+      - is_confirmed
+      - is_current
+      - confirmed_at
+      - checklist_items
+      - evidence
+      title: ConceptVersion
+      description: is_confirmed=true 및 confirmed_at이 필요하다. is_current=false인 확정 과거 버전도 허용한다.
+    ConfirmedConcept:
+      properties:
+        concept_id:
+          type: string
+          format: uuid
+          title: Concept Id
+        unit_id:
+          type: string
+          format: uuid
+          title: Unit Id
+        material_id:
+          type: string
+          format: uuid
+          title: Material Id
+        version:
+          $ref: '#/components/schemas/ConceptVersion'
+      additionalProperties: false
+      type: object
+      required:
+      - concept_id
+      - unit_id
+      - material_id
+      - version
+      title: ConfirmedConcept
+    Coordinates:
+      properties:
+        x:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: X
+        y:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Y
+      additionalProperties: false
+      type: object
+      required:
+      - x
+      - y
+      title: Coordinates
+    CriterionFeedback:
+      properties:
+        checklist_item_id:
+          type: string
+          format: uuid
+          title: Checklist Item Id
+        learner_quote:
+          type: string
+          title: Learner Quote
+        correct_explanation:
+          type: string
+          title: Correct Explanation
+        improvement:
+          type: string
+          title: Improvement
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          title: Evidence
+      additionalProperties: false
+      type: object
+      required:
+      - checklist_item_id
+      - learner_quote
+      - correct_explanation
+      - improvement
+      - evidence
+      title: CriterionFeedback
+    DetailedEvaluationRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        history:
+          items:
+            $ref: '#/components/schemas/Message'
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: History
+        explanation_language:
+          type: string
+          enum:
+          - ko
+          - en
+          title: Explanation Language
+          default: ko
+        previous_result:
+          anyOf:
+          - $ref: '#/components/schemas/EvaluationResult'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - context
+      - concept_version_id
+      - history
+      title: DetailedEvaluationRequest
+    DetailedEvaluationResult:
+      properties:
+        report:
+          $ref: '#/components/schemas/EvaluationResult'
+        feedback:
+          items:
+            $ref: '#/components/schemas/CriterionFeedback'
+          type: array
+          title: Feedback
+        comparison:
+          anyOf:
+          - $ref: '#/components/schemas/EvaluationComparison'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - report
+      - feedback
+      title: DetailedEvaluationResult
+    Document:
+      properties:
+        pages:
+          items:
+            $ref: '#/components/schemas/Page'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Pages
+      additionalProperties: false
+      type: object
+      required:
+      - pages
+      title: Document
+    DraftAnalysis:
+      properties:
+        state:
+          type: string
+          const: draft
+          title: State
+          default: draft
+        units:
+          items:
+            $ref: '#/components/schemas/DraftUnit'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Units
+      additionalProperties: false
+      type: object
+      required:
+      - units
+      title: DraftAnalysis
+    DraftConcept:
+      properties:
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        summary:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Summary
+        checklist_items:
+          items:
+            type: string
+            maxLength: 2000
+            minLength: 1
+          type: array
+          maxItems: 50
+          minItems: 1
+          title: Checklist Items
+        keywords:
+          items:
+            type: string
+            maxLength: 40
+            minLength: 1
+          type: array
+          maxItems: 5
+          minItems: 1
+          title: Keywords
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Evidence
+        estimated_difficulty:
+          anyOf:
+          - type: string
+            enum:
+            - easy
+            - medium
+            - hard
+          - type: 'null'
+          title: Estimated Difficulty
+        estimated_importance:
+          anyOf:
+          - type: number
+            maximum: 1.0
+            minimum: 0.0
+          - type: 'null'
+          title: Estimated Importance
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - summary
+      - checklist_items
+      - keywords
+      - evidence
+      title: DraftConcept
+    DraftUnit:
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+        concepts:
+          items:
+            $ref: '#/components/schemas/DraftConcept'
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: Concepts
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - concepts
+      title: DraftUnit
+    EvaluationComparison:
+      properties:
+        comparable:
+          type: boolean
+          title: Comparable
+        reason:
+          type: string
+          enum:
+          - same_version
+          - version_mismatch
+          - checklist_mismatch
+          - unverified
+          title: Reason
+        coverage_delta:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Coverage Delta
+        changes:
+          items:
+            additionalProperties:
+              type: string
+            type: object
+          type: array
+          title: Changes
+      additionalProperties: false
+      type: object
+      required:
+      - comparable
+      - reason
+      - coverage_delta
+      - changes
+      title: EvaluationComparison
+    EvaluationRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        history:
+          items:
+            $ref: '#/components/schemas/Message'
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: History
+        explanation_language:
+          type: string
+          enum:
+          - ko
+          - en
+          title: Explanation Language
+          default: ko
+      additionalProperties: false
+      type: object
+      required:
+      - context
+      - concept_version_id
+      - history
+      title: EvaluationRequest
+    EvaluationResult:
+      properties:
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        coverage:
+          anyOf:
+          - type: number
+            maximum: 1.0
+            minimum: 0.0
+          - type: 'null'
+          title: Coverage
+        coverage_formula:
+          type: string
+          const: weighted-v1
+          title: Coverage Formula
+          default: weighted-v1
+        assessable_count:
+          type: integer
+          minimum: 0.0
+          title: Assessable Count
+        weighted_score:
+          type: number
+          minimum: 0.0
+          title: Weighted Score
+        items:
+          items:
+            $ref: '#/components/schemas/ReportItem'
+          type: array
+          maxItems: 50
+          title: Items
+        next_action:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Next Action
+        weak_checklist_item_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Weak Checklist Item Ids
+        weak_concept_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Weak Concept Ids
+      additionalProperties: false
+      type: object
+      required:
+      - concept_version_id
+      - coverage
+      - assessable_count
+      - weighted_score
+      - items
+      - next_action
+      - weak_checklist_item_ids
+      - weak_concept_ids
+      title: EvaluationResult
+      description: 저장 전 평가. explained=1, partial=0.5, omission/error=0; unverified는 분모에서 제외. coverage=weighted_score/assessable_count(소수
+        4자리 반올림), 분모가 0이면 null.
+    ExplanationContent:
+      properties:
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+        explanation_markdown:
+          type: string
+          maxLength: 24000
+          minLength: 1
+          title: Explanation Markdown
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Evidence
+      additionalProperties: false
+      type: object
+      required:
+      - title
+      - explanation_markdown
+      - evidence
+      title: ExplanationContent
+    ExplanationRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        explanation_language:
+          type: string
+          enum:
+          - ko
+          - en
+          title: Explanation Language
+          default: ko
+      additionalProperties: false
+      type: object
+      required:
+      - context
+      - concept_version_id
+      title: ExplanationRequest
+    Extraction:
+      properties:
+        document:
+          $ref: '#/components/schemas/Document'
+        chunk_drafts:
+          items:
+            $ref: '#/components/schemas/ChunkDraft'
+          type: array
+          title: Chunk Drafts
+        method:
+          type: string
+          title: Method
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+        ocr_processed_pages:
+          items:
+            type: integer
+          type: array
+          title: Ocr Processed Pages
+        ocr_model_calls:
+          type: integer
+          title: Ocr Model Calls
+          default: 0
+        ready_for_analysis:
+          type: boolean
+          title: Ready For Analysis
+          default: true
+        review_required_pages:
+          items:
+            type: integer
+          type: array
+          title: Review Required Pages
+        structured_pages:
+          items:
+            $ref: '#/components/schemas/ParsedPage'
+          type: array
+          title: Structured Pages
+        recognition:
+          anyOf:
+          - $ref: '#/components/schemas/ParseMetadata'
+          - type: 'null'
+        material_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Material Id
+        filename:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Filename
+          default: material
+        mime_type:
+          type: string
+          title: Mime Type
+        analysis_scope:
+          type: string
+          title: Analysis Scope
+          default: source_text_only; model visual interpretations excluded
+      additionalProperties: false
+      type: object
+      required:
+      - document
+      - chunk_drafts
+      - method
+      - warnings
+      - mime_type
+      title: Extraction
+    GeneratedQuestions:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/StoredQuestion'
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Items
+        verification:
+          items:
+            $ref: '#/components/schemas/AnswerVerification'
+          type: array
+          title: Verification
+      additionalProperties: false
+      type: object
+      required:
+      - items
+      - verification
+      title: GeneratedQuestions
+    GradeRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        stored_question:
+          $ref: '#/components/schemas/StoredQuestion'
+        answer:
+          oneOf:
+          - $ref: '#/components/schemas/MultipleChoiceAnswer'
+          - $ref: '#/components/schemas/ShortAnswer'
+          title: Answer
+          discriminator:
+            propertyName: type
+            mapping:
+              multiple_choice: '#/components/schemas/MultipleChoiceAnswer'
+              short_answer: '#/components/schemas/ShortAnswer'
+      additionalProperties: false
+      type: object
+      required:
+      - context
+      - stored_question
+      - answer
+      title: GradeRequest
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    Keywords:
+      properties:
+        keywords:
+          items:
+            type: string
+            maxLength: 40
+            minLength: 1
+          type: array
+          maxItems: 5
+          minItems: 1
+          title: Keywords
+      additionalProperties: false
+      type: object
+      required:
+      - keywords
+      title: Keywords
+    Message:
+      properties:
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+          title: Role
+        content:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Content
+      additionalProperties: false
+      type: object
+      required:
+      - role
+      - content
+      title: Message
+    ModelRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+      additionalProperties: false
+      type: object
+      title: ModelRequest
+    MultipleChoiceAnswer:
+      properties:
+        type:
+          type: string
+          const: multiple_choice
+          title: Type
+        selected_option_ids:
+          items:
+            type: string
+            maxLength: 40
+            minLength: 1
+          type: array
+          maxItems: 1
+          minItems: 1
+          title: Selected Option Ids
+      additionalProperties: false
+      type: object
+      required:
+      - type
+      - selected_option_ids
+      title: MultipleChoiceAnswer
+    Option:
+      properties:
+        id:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Id
+        text:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Text
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - text
+      title: Option
+    Page:
+      properties:
+        number:
+          type: integer
+          maximum: 500.0
+          minimum: 1.0
+          title: Number
+        text:
+          type: string
+          maxLength: 100000
+          title: Text
+      additionalProperties: false
+      type: object
+      required:
+      - number
+      - text
+      title: Page
+    ParseMetadata:
+      properties:
+        source_sha256:
+          type: string
+          title: Source Sha256
+        requested_model:
+          type: string
+          title: Requested Model
+        actual_models:
+          items:
+            type: string
+          type: array
+          title: Actual Models
+        mode:
+          type: string
+          const: enhanced
+          title: Mode
+          default: enhanced
+        ocr:
+          type: string
+          const: force
+          title: Ocr
+          default: force
+        status:
+          type: string
+          enum:
+          - recognized
+          - review_required
+          - partial
+          title: Status
+        estimated_cost_usd:
+          type: number
+          title: Estimated Cost Usd
+        price_source:
+          type: string
+          title: Price Source
+          default: https://www.upstage.ai/pricing/api
+        price_checked_on:
+          type: string
+          title: Price Checked On
+          default: '2026-11-04'
+        cost_note:
+          type: string
+          title: Cost Note
+          default: Initial public-list-price estimate, not actual billing; excludes VAT/credits.
+        cache_hit:
+          type: boolean
+          title: Cache Hit
+          default: false
+        requests_sent:
+          type: integer
+          title: Requests Sent
+          default: 0
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      additionalProperties: false
+      type: object
+      required:
+      - source_sha256
+      - requested_model
+      - actual_models
+      - status
+      - estimated_cost_usd
+      title: ParseMetadata
+    ParsedElement:
+      properties:
+        source_element_id:
+          type: integer
+          minimum: 0.0
+          title: Source Element Id
+        page_number:
+          type: integer
+          maximum: 200.0
+          minimum: 1.0
+          title: Page Number
+        order:
+          type: integer
+          minimum: 0.0
+          title: Order
+        category:
+          type: string
+          title: Category
+        sub_category:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sub Category
+        markdown:
+          type: string
+          maxLength: 100000
+          title: Markdown
+        html:
+          type: string
+          maxLength: 200000
+          title: Html
+          default: ''
+        text:
+          type: string
+          maxLength: 100000
+          title: Text
+          default: ''
+        coordinates:
+          items:
+            $ref: '#/components/schemas/Coordinates'
+          type: array
+          maxItems: 20
+          title: Coordinates
+        visual_interpretation:
+          type: boolean
+          title: Visual Interpretation
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - source_element_id
+      - page_number
+      - order
+      - category
+      - markdown
+      title: ParsedElement
+    ParsedPage:
+      properties:
+        page_number:
+          type: integer
+          maximum: 200.0
+          minimum: 1.0
+          title: Page Number
+        markdown:
+          type: string
+          maxLength: 100000
+          title: Markdown
+        elements:
+          items:
+            $ref: '#/components/schemas/ParsedElement'
+          type: array
+          title: Elements
+        status:
+          type: string
+          enum:
+          - recognized
+          - review_required
+          - missing
+          title: Status
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      additionalProperties: false
+      type: object
+      required:
+      - page_number
+      - markdown
+      - elements
+      - status
+      title: ParsedPage
+    PlanDay:
+      properties:
+        date:
+          type: string
+          format: date
+          title: Date
+        tasks:
+          items:
+            $ref: '#/components/schemas/PlanTask'
+          type: array
+          title: Tasks
+        estimated_minutes:
+          type: integer
+          minimum: 0.0
+          title: Estimated Minutes
+      additionalProperties: false
+      type: object
+      required:
+      - date
+      - tasks
+      - estimated_minutes
+      title: PlanDay
+    PlanTask:
+      properties:
+        concept_id:
+          type: string
+          format: uuid
+          title: Concept Id
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        name:
+          type: string
+          title: Name
+        activity:
+          type: string
+          enum:
+          - learn
+          - practice
+          - teachback
+          - review
+          title: Activity
+        count:
+          type: integer
+          minimum: 1.0
+          title: Count
+        estimated_minutes:
+          type: integer
+          minimum: 1.0
+          title: Estimated Minutes
+        source_pages:
+          items:
+            type: integer
+          type: array
+          title: Source Pages
+        priority:
+          type: number
+          title: Priority
+      additionalProperties: false
+      type: object
+      required:
+      - concept_id
+      - concept_version_id
+      - name
+      - activity
+      - count
+      - estimated_minutes
+      - source_pages
+      - priority
+      title: PlanTask
+      description: count는 활동 단위 수이다. learn/review는 체크리스트 항목 수, practice는 문항 수, teachback은 세션 수. 같은 날 같은 활동은 합산될
+        수 있다.
+    PublicQuestionDraft:
+      properties:
+        question_type:
+          type: string
+          enum:
+          - multiple_choice
+          - short_answer
+          title: Question Type
+        concept_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: Concept Ids
+        concept_version_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: Concept Version Ids
+        prompt:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Prompt
+        options:
+          items:
+            $ref: '#/components/schemas/Option'
+          type: array
+          maxItems: 5
+          title: Options
+        difficulty:
+          type: string
+          enum:
+          - easy
+          - medium
+          - hard
+          title: Difficulty
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Evidence
+      additionalProperties: false
+      type: object
+      required:
+      - question_type
+      - concept_ids
+      - concept_version_ids
+      - prompt
+      - options
+      - difficulty
+      - evidence
+      title: PublicQuestionDraft
+    QuestionGenerationRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        unit_id:
+          type: string
+          format: uuid
+          title: Unit Id
+        concept_version_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: Concept Version Ids
+        count:
+          type: integer
+          maximum: 20.0
+          minimum: 5.0
+          title: Count
+        difficulty:
+          type: string
+          enum:
+          - easy
+          - medium
+          - hard
+          - mixed
+          title: Difficulty
+        difficulty_plan:
+          anyOf:
+          - items:
+              type: string
+              enum:
+              - easy
+              - medium
+              - hard
+            type: array
+            maxItems: 20
+            minItems: 1
+          - type: 'null'
+          title: Difficulty Plan
+        question_types:
+          items:
+            type: string
+            enum:
+            - multiple_choice
+            - short_answer
+          type: array
+          maxItems: 2
+          minItems: 1
+          title: Question Types
+        explanation_language:
+          type: string
+          enum:
+          - ko
+          - en
+          title: Explanation Language
+          default: ko
+      additionalProperties: false
+      type: object
+      required:
+      - context
+      - unit_id
+      - concept_version_ids
+      - count
+      - difficulty
+      title: QuestionGenerationRequest
+      description: Public internal HTTP input; smaller batches remain an implementation detail.
+    QuestionResult:
+      properties:
+        is_correct:
+          type: boolean
+          title: Is Correct
+        feedback:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Feedback
+        correct_answer:
+          oneOf:
+          - $ref: '#/components/schemas/MultipleChoiceAnswer'
+          - $ref: '#/components/schemas/ShortAnswer'
+          title: Correct Answer
+          discriminator:
+            propertyName: type
+            mapping:
+              multiple_choice: '#/components/schemas/MultipleChoiceAnswer'
+              short_answer: '#/components/schemas/ShortAnswer'
+        explanation:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Explanation
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Evidence
+      additionalProperties: false
+      type: object
+      required:
+      - is_correct
+      - feedback
+      - correct_answer
+      - explanation
+      - evidence
+      title: QuestionResult
+    ReportItem:
+      properties:
+        concept_id:
+          type: string
+          format: uuid
+          title: Concept Id
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        checklist_item_id:
+          type: string
+          format: uuid
+          title: Checklist Item Id
+        status:
+          type: string
+          enum:
+          - explained
+          - partial
+          - omission
+          - error
+          - unverified
+          title: Status
+        description:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Description
+        confidence:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          title: Confidence
+        evidence:
+          items:
+            $ref: '#/components/schemas/SourceEvidence'
+          type: array
+          title: Evidence
+      additionalProperties: false
+      type: object
+      required:
+      - concept_id
+      - concept_version_id
+      - checklist_item_id
+      - status
+      - description
+      - confidence
+      - evidence
+      title: ReportItem
+    ShortAnswer:
+      properties:
+        type:
+          type: string
+          const: short_answer
+          title: Type
+        text:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Text
+      additionalProperties: false
+      type: object
+      required:
+      - type
+      - text
+      title: ShortAnswer
+    SourceChunk:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        material_id:
+          type: string
+          format: uuid
+          title: Material Id
+        material_name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Material Name
+        page_number:
+          type: integer
+          minimum: 1.0
+          title: Page Number
+        text:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Text
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - material_id
+      - material_name
+      - page_number
+      - text
+      title: SourceChunk
+    SourceEvidence:
+      properties:
+        chunk_id:
+          type: string
+          format: uuid
+          title: Chunk Id
+        material_id:
+          type: string
+          format: uuid
+          title: Material Id
+        material_name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Material Name
+        page_number:
+          type: integer
+          minimum: 1.0
+          title: Page Number
+        excerpt:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Excerpt
+      additionalProperties: false
+      type: object
+      required:
+      - chunk_id
+      - material_id
+      - material_name
+      - page_number
+      - excerpt
+      title: SourceEvidence
+    StoredQuestion:
+      properties:
+        question:
+          $ref: '#/components/schemas/PublicQuestionDraft'
+        correct_answer:
+          oneOf:
+          - $ref: '#/components/schemas/MultipleChoiceAnswer'
+          - $ref: '#/components/schemas/ShortAnswer'
+          title: Correct Answer
+          discriminator:
+            propertyName: type
+            mapping:
+              multiple_choice: '#/components/schemas/MultipleChoiceAnswer'
+              short_answer: '#/components/schemas/ShortAnswer'
+        explanation:
+          type: string
+          maxLength: 12000
+          minLength: 1
+          title: Explanation
+        accepted_answers:
+          items:
+            type: string
+            maxLength: 12000
+            minLength: 1
+          type: array
+          maxItems: 20
+          title: Accepted Answers
+        arithmetic_expression:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+          title: Arithmetic Expression
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      - correct_answer
+      - explanation
+      title: StoredQuestion
+      description: 정답·해설을 포함한 비공개 저장 형식. 풀이 전 사용자에게 그대로 전달하지 않는다.
+    StudyContext:
+      properties:
+        concepts:
+          items:
+            $ref: '#/components/schemas/ConfirmedConcept'
+          type: array
+          maxItems: 100
+          minItems: 1
+          title: Concepts
+        chunks:
+          items:
+            $ref: '#/components/schemas/SourceChunk'
+          type: array
+          maxItems: 200
+          minItems: 1
+          title: Chunks
+      additionalProperties: false
+      type: object
+      required:
+      - concepts
+      - chunks
+      title: StudyContext
+      description: 백엔드가 저장한 확정 버전과 원문. UUID v4, ID 관계·근거 발췌 일치 등 교차 검증이 JSON Schema 외에 실행된다.
+    StudyPlan:
+      properties:
+        today:
+          type: string
+          format: date
+          title: Today
+        exam_date:
+          type: string
+          format: date
+          title: Exam Date
+        total_pages:
+          type: integer
+          title: Total Pages
+        concept_count:
+          type: integer
+          title: Concept Count
+        urgent:
+          type: boolean
+          title: Urgent
+        days:
+          items:
+            $ref: '#/components/schemas/PlanDay'
+          type: array
+          title: Days
+        today_tasks:
+          items:
+            $ref: '#/components/schemas/PlanTask'
+          type: array
+          title: Today Tasks
+        total_minutes:
+          type: integer
+          title: Total Minutes
+        assumptions:
+          items:
+            type: string
+          type: array
+          title: Assumptions
+      additionalProperties: false
+      type: object
+      required:
+      - today
+      - exam_date
+      - total_pages
+      - concept_count
+      - urgent
+      - days
+      - today_tasks
+      - total_minutes
+      - assumptions
+      title: StudyPlan
+    StudyTimeEstimate:
+      properties:
+        estimate:
+          type: boolean
+          const: true
+          title: Estimate
+          default: true
+        remaining_days:
+          type: integer
+          title: Remaining Days
+        total_minutes:
+          type: integer
+          title: Total Minutes
+        recommended_daily_minutes:
+          type: integer
+          title: Recommended Daily Minutes
+        concepts:
+          items:
+            $ref: '#/components/schemas/ConceptTime'
+          type: array
+          title: Concepts
+        assumptions:
+          items:
+            type: string
+          type: array
+          title: Assumptions
+        priority_guidance:
+          type: string
+          title: Priority Guidance
+      additionalProperties: false
+      type: object
+      required:
+      - remaining_days
+      - total_minutes
+      - recommended_daily_minutes
+      - concepts
+      - assumptions
+      - priority_guidance
+      title: StudyTimeEstimate
+    TagRequest:
+      properties:
+        model_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Model Id
+          description: 외부 텍스트 AI 호출에서는 명시 필수. 스키마 기본값 null은 런타임 생략 허용을 뜻하지 않는다. 로컬 채점은 예외.
+        question:
+          $ref: '#/components/schemas/PublicQuestionDraft'
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        subject_hint:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 1
+          - type: 'null'
+          title: Subject Hint
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      - context
+      title: TagRequest
+    TimeConcept:
+      properties:
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        name:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Name
+        remaining_criteria:
+          type: integer
+          maximum: 50.0
+          minimum: 0.0
+          title: Remaining Criteria
+        remaining_questions:
+          type: integer
+          maximum: 200.0
+          minimum: 0.0
+          title: Remaining Questions
+          default: 0
+        review_cycles:
+          type: integer
+          maximum: 10.0
+          minimum: 0.0
+          title: Review Cycles
+          default: 1
+        review_criteria:
+          anyOf:
+          - type: integer
+            maximum: 50.0
+            minimum: 0.0
+          - type: 'null'
+          title: Review Criteria
+        weakness:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Weakness
+          default: 0
+        difficulty:
+          type: string
+          enum:
+          - easy
+          - medium
+          - hard
+          title: Difficulty
+          default: medium
+        importance:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Importance
+          default: 0.5
+        teachback_sessions:
+          type: integer
+          maximum: 10.0
+          minimum: 0.0
+          title: Teachback Sessions
+          default: 0
+      additionalProperties: false
+      type: object
+      required:
+      - concept_version_id
+      - name
+      - remaining_criteria
+      title: TimeConcept
+    TranscriptFragment:
+      properties:
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+          title: Role
+        delta:
+          type: string
+          maxLength: 4000
+          title: Delta
+        start_ms:
+          type: integer
+          minimum: 0.0
+          title: Start Ms
+        end_ms:
+          type: integer
+          minimum: 0.0
+          title: End Ms
+      additionalProperties: false
+      type: object
+      required:
+      - role
+      - delta
+      - start_ms
+      - end_ms
+      title: TranscriptFragment
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VoiceEvaluationRequest:
+      properties:
+        model_id:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Model Id
+        previous_result:
+          anyOf:
+          - $ref: '#/components/schemas/EvaluationResult'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - model_id
+      title: VoiceEvaluationRequest
+    VoiceSessionCreated:
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          title: Session Id
+        connection_token:
+          type: string
+          title: Connection Token
+        websocket_path:
+          type: string
+          title: Websocket Path
+        connect_within_seconds:
+          type: integer
+          title: Connect Within Seconds
+          default: 60
+        max_duration_seconds:
+          type: integer
+          title: Max Duration Seconds
+        sample_rate:
+          type: integer
+          title: Sample Rate
+          default: 24000
+      additionalProperties: false
+      type: object
+      required:
+      - session_id
+      - connection_token
+      - websocket_path
+      - max_duration_seconds
+      title: VoiceSessionCreated
+    VoiceSessionRequest:
+      properties:
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        explanation_language:
+          type: string
+          const: ko
+          title: Explanation Language
+          default: ko
+      additionalProperties: false
+      type: object
+      required:
+      - context
+      - concept_version_id
+      title: VoiceSessionRequest
+    VoiceSessionResult:
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          title: Session Id
+        concept_version_id:
+          type: string
+          format: uuid
+          title: Concept Version Id
+        status:
+          type: string
+          enum:
+          - created
+          - active
+          - closed
+          - failed
+          title: Status
+        question_count:
+          type: integer
+          minimum: 0.0
+          title: Question Count
+        transcript:
+          items:
+            $ref: '#/components/schemas/TranscriptFragment'
+          type: array
+          title: Transcript
+        provider_finalized:
+          type: boolean
+          title: Provider Finalized
+        usage:
+          additionalProperties: true
+          type: object
+          title: Usage
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Code
+      additionalProperties: false
+      type: object
+      required:
+      - session_id
+      - concept_version_id
+      - status
+      - question_count
+      - transcript
+      - provider_finalized
+      - usage
+      title: VoiceSessionResult
+      description: 임시 메모리 결과이며 공개 백엔드 TeachbackSession DTO와 다르다. usage는 공급자 메타데이터로 고정 필드 보장이 없다.
+    WorkloadEstimate:
+      properties:
+        remaining_days:
+          type: integer
+          title: Remaining Days
+        total_pages:
+          type: integer
+          title: Total Pages
+        concept_count:
+          type: integer
+          title: Concept Count
+        recommended_daily_pages:
+          type: integer
+          title: Recommended Daily Pages
+        recommended_daily_concepts:
+          type: integer
+          title: Recommended Daily Concepts
+        time_estimate:
+          $ref: '#/components/schemas/StudyTimeEstimate'
+        assumptions:
+          items:
+            type: string
+          type: array
+          title: Assumptions
+      additionalProperties: false
+      type: object
+      required:
+      - remaining_days
+      - total_pages
+      - concept_count
+      - recommended_daily_pages
+      - recommended_daily_concepts
+      - time_estimate
+      - assumptions
+      title: WorkloadEstimate
+    WorkloadRequest:
+      properties:
+        total_pages:
+          type: integer
+          maximum: 100000.0
+          minimum: 1.0
+          title: Total Pages
+        context:
+          $ref: '#/components/schemas/StudyContext'
+        exam_date:
+          type: string
+          format: date
+          title: Exam Date
+        today:
+          type: string
+          format: date
+          title: Today
+        progress:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/TimeConcept'
+            type: array
+          - type: 'null'
+          title: Progress
+      additionalProperties: false
+      type: object
+      required:
+      - total_pages
+      - context
+      - exam_date
+      title: WorkloadRequest
+      description: today 생략 시 한국 시간 오늘. progress 생략 시 기본 진도로 계산한다. model_id를 받지 않는다.
+    AIErrorEnvelope:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+          additionalProperties: false
+      additionalProperties: false
+    RuntimeValidationEnvelope:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - details
+          properties:
+            code:
+              type: string
+              const: VALIDATION_ERROR
+            details:
+              type: array
+              items:
+                type: object
+                required:
+                - loc
+                - type
+                properties:
+                  loc:
+                    type: array
+                    items:
+                      anyOf:
+                      - type: string
+                      - type: integer
+                  type:
+                    type: string
+    HTTPDetailEnvelope:
+      type: object
+      required:
+      - detail
+      properties:
+        detail:
+          type: string
+  securitySchemes:
+    ServerKey:
+      type: apiKey
+      in: header
+      name: X-AI-API-Key
+      description: 모든 내부 HTTP 요청 필수. 백엔드 서버 전용 인증키.
+    ProviderBYOK:
+      type: apiKey
+      in: header
+      name: X-AI-Key
+      description: 선택 헤더. 텍스트 AI 호출용 BYOK이며 서버 인증키를 대신하지 않는다. 서버 키 대체 설정이 꺼져 있으면 외부 텍스트 호출에 필수이다.
+  responses:
+    InternalError401:
+      description: 서버 인증키 누락 또는 불일치.
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/HTTPDetailEnvelope'
+    InternalError409:
+      description: 'DOCUMENT_PROCESSING_STATE: 문서 인식 상태 충돌. 또는 동일 음성 세션 평가 진행 중(detail 형식).'
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/AIErrorEnvelope'
+            - $ref: '#/components/schemas/HTTPDetailEnvelope'
+    InternalError413:
+      description: Request body exceeds size limit.
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/HTTPDetailEnvelope'
+    InternalError422:
+      description: VALIDATION_ERROR / MODEL_NOT_ALLOWED / PROVIDER_AUTH. 입력·모델 허용 목록·외부 접근 권한 확인.
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/RuntimeValidationEnvelope'
+            - $ref: '#/components/schemas/AIErrorEnvelope'
+    InternalError429:
+      description: RATE_LIMITED 또는 작업 슬롯 초과(detail 형식). 외부 제한은 Retry-After가 포함될 수 있다.
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/AIErrorEnvelope'
+            - $ref: '#/components/schemas/HTTPDetailEnvelope'
+      headers:
+        Retry-After:
+          description: 외부 공급자가 재시도 대기 시간을 제공한 경우에만 포함한다.
+          schema:
+            type: string
+    InternalError502:
+      description: INVALID_OUTPUT / PROVIDER_REQUEST_INVALID / PROVIDER_BAD_GATEWAY / PROVIDER_UNAVAILABLE. 공급자
+        요청 거절이나 불완전 출력도 실패이다.
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/AIErrorEnvelope'
+    InternalError503:
+      description: CONFIGURATION_ERROR / KEY_VALIDATION_UNAVAILABLE / PROVIDER_SERVICE_UNAVAILABLE. 또는 서버 인증 미설정(detail
+        형식).
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/AIErrorEnvelope'
+            - $ref: '#/components/schemas/HTTPDetailEnvelope'
+    InternalError504:
+      description: PROVIDER_TIMEOUT. 외부 처리 완료/과금 여부를 보장하지 않는다.
+      content:
+        application/json:
+          schema:
+            anyOf:
+            - $ref: '#/components/schemas/AIErrorEnvelope'
+servers:
+- url: http://127.0.0.1:8000
+  description: 로컬 개발. 운영 주소는 배포 시 백엔드에 전달하며 HTTPS/WSS를 사용한다.
+x-reviewed-date: '2026-11-12'
+x-source:
+- api/app.py
+- api/config.py
+- src/models.py
+- src/material.py
+- src/study_time.py
+- src/teachback.py
+- api/gemini.py
+x-integration-notes:
+  authentication:
+  - health 외 모든 내부 HTTP 요청에 X-AI-API-Key가 필수이다. 프론트엔드에 서버 키를 전달하지 않는다.
+  - 외부 텍스트 AI 호출에는 X-AI-Key가 우선한다. 없으면 AI_USE_SERVER_TEXT_KEY=true일 때 서버 GEMINI_API_KEY로 대체한다. 둘 다 없으면 실패한다.
+  - 자료 추출은 서버 UPSTAGE_API_KEY(PDF/PNG/JPEG), 음성은 서버 GEMINI_API_KEY를 사용한다. TXT·시간·계획·로컬 채점에는 외부 AI 키가 필요 없다.
+  - 텍스트 생성에는 AI_LIVE_ENABLED=true가 필요하다. 음성에는 GEMINI_LIVE_ENABLED=true가 필요하며 텍스트 스위치와 별개이다.
+  models:
+  - 텍스트 생성·분석·평가·설명·키워드는 model_id를 반드시 전달한다. 스키마에서는 nullable/생략 가능하지만 HTTP 실행 함수가 없거나 빈 값을 422로 거절한다.
+  - 객관식·정확 일치 단답형 채점은 model_id 없이 가능하다. 의미 채점으로 넘어가면 명시적 model_id와 텍스트 AI 설정이 필요하다.
+  - gemini:<model-name> 형태를 사용한다. 서버 허용 목록의 활성 모델이어야 하며 AI_ALLOW_UNLISTED_MODELS=true이면 목록 밖 유효 Gemini 이름도 허용한다.
+    실제 모델 접근성은 별도이다.
+  - GEMINI_TEXT_MODEL은 기본 목록/기본 라우트를 구성한다. HTTP 생성 요청의 필수 model_id를 대신하지 않는다.
+  - 음성 모델은 서버 GEMINI_LIVE_MODEL 설정이다. 음성 세션 생성 입력에는 model_id가 없고 음성 평가 요청의 model_id는 텍스트 평가용이다.
+  backend_workflow:
+  - extract의 chunk_drafts를 백엔드가 저장하며 각 청크 UUID v4를 발급한다. SourceChunk(id, material_id, material_name, page_number,
+    text)를 구성해 analyze로 보낸다.
+  - analyze 결과는 state=draft이다. 사용자 검토 후 백엔드가 단원/개념/버전/체크리스트 UUID v4와 confirmed_at을 저장한다.
+  - StudyContext는 확정 버전과 원문 SourceChunk이다. 근거의 청크·자료 ID/자료명/페이지/발췌가 원문과 일치해야 한다. 확정 과거 버전(is_current=false)도 허용한다.
+  - 버전/개념/체크리스트/원문 관계를 보존한다. ID만 보내면 AI 서버가 DB에서 조회하는 구조가 아니다. 개인정보·접근 권한은 호출 전에 백엔드가 확인한다.
+  - 문제 생성 items(StoredQuestion)에는 정답·해설이 들어 있다. 비공개 저장 후 public_question 투영과 백엔드 문제 ID를 사용해 풀이 전 공개한다.
+  - 평가 report는 저장 전 결과이다. 공개 SessionReport에는 백엔드가 report_id/session_id/version_no/action_id와 각 report item ID를 추가해야
+    한다(src.evaluation.session_report 참고).
+  - previous_result에는 EvaluationResult만 전달한다. 저장용 SessionReport의 추가 DB 필드를 그대로 넣으면 extra=forbid 검증에 실패한다. DetailedEvaluationResult에서는
+    report를 사용한다.
+  - 계획에는 DB ID/완료 이력/리비전이 없다. 백엔드가 날짜별 tasks를 저장하고 사용자별 진행 상태를 관리한다.
+  runtime_limits:
+  - '요청 본문 상한: extract 20971520 bytes, 나머지 HTTP 2097152 bytes. schema 배열 상한 이내여도 본문 총량 제한이 먼저 적용된다.'
+  - 프로세스별 동시 작업 슬롯 2개를 HTTP와 음성 WebSocket이 공유한다. 초과 HTTP 429, WebSocket 4429. 영구 큐는 없다.
+  - 외부 SDK 자동 재시도/모델 자동 변경 없음. 한 기능 요청은 내부 분할로 여러 외부 호출을 할 수 있다. 실패 시 부분 성공 응답은 반환하지 않는다.
+  - AI_TIMEOUT_SECONDS는 각 텍스트 SDK 호출 제한(코드 기본 60초, README 개발 예시 120초)이다. 여러 배치의 HTTP 전체 시간 제한이 아니다. 백엔드/프록시 제한을
+    별도로 설정한다.
+  - POST 생성 요청 전체의 멱등성/중복 과금 방지는 제공하지 않는다. 타임아웃·연결 단절 후 무조건 재호출하지 말고 백엔드 Job 상태와 중복 실행을 관리한다.
+  - 생략한 today는 한국 시간(UTC+09:00) 오늘이다. 명시한 today가 계산 기준이다. 학습 시간은 추정값이다.
+  public_backend_contract_differences:
+  - 기존 swagger-api-final.yaml은 별도 사용자용 명세이며 이 파일로 수정/대체하지 않는다.
+  - 현재 내부 문제 생성은 count 5~20, mixed+difficulty_plan, question_types를 지원한다. 기존 공개 문제 생성 명세의 count 1~20/단일 난이도와 다르다.
+  - 계획 activity practice→공개 task_type solve, teachback→teach_back, review→review 매핑이 필요하다. learn은 기존 공개 enum에 없어
+    별도 합의가 필요하다.
+  - 내부 계획 count는 학습/복습 시 체크리스트 수, practice 시 문항 수, teachback 시 세션 수이다. 날짜별 합산 count가 공개 target_count 상한 20을 넘으면
+    활동 의미에 맞게 분할/명세 조정이 필요하다.
+  - 음성은 한국어 고정, 학생 유형 선택 없음, 질문 수 제한 없음이다. 기존 공개 세션 질문 최대 3회/ko,en/persona와 직접 호환되지 않는다.
+  - 상세 평가 feedback/comparison과 실시간 음성 연결 정보는 기존 공개 응답과 별도로 저장/노출 방식을 합의해야 한다.
+x-error-contract: 공통 오류 목록이며 기능에 따라 적용 범위가 다르다. 외부 AI를 호출하지 않는 시간/계획 계산에는 공급자 오류가 발생하지 않는다. 예상하지 못한 서버 예외는 500일
+  수 있으며 본문 형식을 보장하지 않는다.
+x-websocket:
+  path: /internal/teachback/sessions/{session_id}/audio
+  description: OpenAPI HTTP paths에 포함되지 않는 WebSocket 전용 계약. 서버 키 대신 세션 생성에서 받은 1회용 토큰으로 인증한다.
+  sequence:
+  - 백엔드가 서버 인증키로 HTTP 세션 생성. 응답의 websocket_path에 ws/wss origin을 결합한다.
+  - 연결 후 10초 이내 첫 텍스트 프레임으로 authenticate를 보낸다. 토큰은 세션 생성 시점부터 60초·1회용이다.
+  - ready를 받은 뒤 오디오를 보내며 서버의 바이너리 오디오를 재생한다. 자막 JSON도 병행 수신한다.
+  - 사용자 종료 시 end를 보내고 closed까지 계속 수신한다. 즉시 소켓을 끊으면 정상 종료/전사 완결을 보장하지 못한다.
+  - closed status=closed와 provider_finalized=true 확인 후 HTTP 평가를 호출한다. 실패/미완성 세션은 평가하지 않는다.
+  client_messages:
+    authenticate:
+      transport: text JSON
+      schema:
+        type: object
+        required:
+        - type
+        - connection_token
+        properties:
+          type:
+            const: authenticate
+          connection_token:
+            type: string
+            maxLength: 200
+        additionalProperties: false
+    audio:
+      transport: binary
+      encoding: raw mono PCM16 little endian, 24000 Hz
+      max_frame_bytes: 9600
+      frame_rules: 0 bytes 금지, 짝수 길이, 최대 200ms. WAV 헤더/WebM/Opus/base64 JSON은 지원하지 않는다. 실시간 속도로 전송한다.
+    end:
+      transport: text JSON
+      schema:
+        type: object
+        required:
+        - type
+        properties:
+          type:
+            const: end
+        additionalProperties: false
+  server_messages:
+    ready:
+      transport: text JSON
+      example:
+        type: ready
+        sample_rate: 24000
+    audio:
+      transport: binary
+      encoding: raw mono PCM16 little endian, 24000 Hz
+    transcript:
+      transport: text JSON
+      schema:
+        properties:
+          role:
+            type: string
+            enum:
+            - user
+            - assistant
+            title: Role
+          delta:
+            type: string
+            maxLength: 4000
+            title: Delta
+          start_ms:
+            type: integer
+            minimum: 0.0
+            title: Start Ms
+          end_ms:
+            type: integer
+            minimum: 0.0
+            title: End Ms
+          type:
+            type: string
+            const: transcript
+        additionalProperties: false
+        type: object
+        required:
+        - role
+        - delta
+        - start_ms
+        - end_ms
+        - type
+        title: TranscriptFragment
+      description: TranscriptFragment의 role/delta/start_ms/end_ms에 type=transcript 필드를 추가한 이벤트. delta는 저장된 전사 조각이며
+        중복 이어붙임에 주의한다. 시각은 세션 연결 이후 서버 수신/커밋 기준 근사 ms로 발화 시작 시각 보장이 없다.
+    playback.clear:
+      transport: text JSON
+      example:
+        type: playback.clear
+      description: 프론트는 재생 큐를 즉시 비우고 현재 AI 재생을 중단한다. 끼어들기/종료 등에 전송된다.
+    closed:
+      transport: text JSON
+      example:
+        type: closed
+        status: closed
+        provider_finalized: true
+        error_code: null
+      description: status는 closed 또는 failed. 실패 시 error_code가 설정될 수 있다. 마지막 JSON과 소켓 종료를 구분한다.
+  close_codes:
+    '1000': 정상 소켓 종료. 세션 성공 여부는 closed 이벤트/provider_finalized로 별도 확인.
+    '4401': 인증 형식 오류/토큰 무효·만료·재사용/인증 대기 시간 초과 등.
+    '4429': 동시 작업 슬롯 부족.
+  lifecycle:
+  - 최대 32개 세션을 단일 프로세스 메모리에 보관한다. 생성 후 max_duration_seconds+900초가 지나면 조회 불가. 서버 재시작 시 모두 소실된다.
+  - 최대 연결 시간은 응답 max_duration_seconds(기본 300초). 도달하면 서버가 종료를 시작한다. 입력이 있으면 공급자 종료 확인을 최대 15초 기다리므로 종료 드레인 시간이 추가될
+    수 있다.
+  - 새 세션 생성은 새 대화이다. 사용한 토큰으로 재연결/대화 재개는 지원하지 않는다. 다중 워커/다중 인스턴스 공유 저장소도 없다.
+  - AI 학생 질문은 횟수 제한이 없으며 question_count는 assistant 전사 내 물음표 개수의 근사값이다.
+  - 백엔드가 사용자 권한과 세션 소유권을 확인하며 프론트에는 서버 인증키/외부 AI 키를 전달하지 않는다.
